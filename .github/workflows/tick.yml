@@ -1,0 +1,24 @@
+# Calls the site's payout timer once a minute, around the clock.
+# GitHub starts this every 5 minutes (its shortest schedule, and runs often start late), and each run keeps calling
+# for 15 minutes, so the runs overlap; a newer run cancels the older one, so there's always exactly one going.
+# Calling /api/tick twice is harmless: the site only lets one payout round run at a time and pays each round once.
+name: tick
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+concurrency:
+  group: tick
+  cancel-in-progress: true
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Call /api/tick every minute for 15 minutes
+        run: |
+          for i in $(seq 1 15); do
+            (curl -s -m 70 -o /dev/null -w "%{http_code} $(date -u +%H:%M:%S)\n" https://holdpays-clone.vercel.app/api/tick || echo "failed $(date -u +%H:%M:%S)") &
+            sleep 60
+          done
+          wait
